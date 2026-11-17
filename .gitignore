@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.venv
+venv/
+
+# Audio / Video media files
+*.flac
+*.wav
+*.mp3
+*.wmv
+*.bik
+*.bak
+
+# Temporary files
+temp/
+scratch/
+_temp_fix/
+*.tmp
+.DS_Store
+Thumbs.db
