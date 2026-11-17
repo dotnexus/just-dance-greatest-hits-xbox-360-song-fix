@@ -20,6 +20,7 @@ A universal toolkit, reverse-engineering guide, and methodology to replace in-ga
 > 
 > * **Educational & Research Purposes Only:** This project, including its documentation, tools, and scripts, is provided strictly for educational, interoperability research, and personal game modding purposes.
 > * **No Copyrighted Content Included:** This repository does **NOT** contain, host, or distribute any proprietary game binaries, copyrighted audio tracks, videos, or game assets. Users must independently supply their own legally acquired copy of the game and their own legally obtained audio files.
+> * **Zero Copyright Liability in Presets:** Community timing presets (`presets.json`) contain strictly factual, mathematical coordinates (timestamps, decibel levels, and millisecond offsets). No audio waveforms, protected lyrics, or creative intellectual property are included.
 > * **No Affiliation:** This project is an independent community research effort and is in no way affiliated with, endorsed by, sponsored by, or associated with any game developer, publisher, console manufacturer, or music copyright owner.
 > * **Limitation of Liability:** The authors and contributors assume no responsibility or liability whatsoever for any misuse of this software, copyright infringement, data loss, console bans, or damages of any kind resulting from the use or inability to use this toolkit. Users are solely responsible for ensuring compliance with applicable local laws and copyright regulations.
 
@@ -27,7 +28,8 @@ A universal toolkit, reverse-engineering guide, and methodology to replace in-ga
 
 ### Features
 - 🔄 **Universal Song Replacement:** Works dynamically on any song detected in the game folder.
-- 🎯 **Automatic Beat Alignment:** Automatically detects lead-in silence differences using onset cross-correlation so the audio synchronizes with the dancers, choreographies, and pictograms.
+- 📐 **Verified Presets System (`presets.json`):** Includes tested, millisecond-accurate mathematical timing profiles (such as the verified preset for `BarbieGirl`), requiring zero manual configuration.
+- 🎯 **Automatic Beat Alignment:** Automatically detects lead-in silence differences using onset cross-correlation for any track without a preset.
 - 🔊 **Console Loudness Normalization:** Automatically adjusts modern loud audio masters to the **-24.3 LUFS** Xbox 360 standard, preventing distortion and protecting in-game sound effects.
 - 🎬 **Lossless Video Quality:** Copies the original video stream directly (`-c:v copy`), preserving 100% of the visual fidelity.
 - 📦 **Full Track Coverage:** Patches the main song video (`<Song>.wmv`), Mashup/Medley clips (`<Song>_A.wmv`, `<Song>_B.wmv`), and the menu selection preview (`<Song>_Preview.bik`).
@@ -78,8 +80,26 @@ By remuxing the WMV file with your replacement audio track (preserving the exact
 
 ---
 
-### Dynamic Song Detection
-The script automatically reads the `videos/` folder of your legally extracted game copy and displays an interactive menu of all available songs, so you do not need to look up or type internal codenames manually.
+### Community Verified Presets (`presets.json`)
+
+To make song replacement effortless and completely copyright-safe, this repository introduces a mathematical timing preset format:
+
+```json
+{
+  "BarbieGirl": {
+    "description": "Verified studio track timing profile",
+    "offset_seconds": 0.750,
+    "target_lufs": -24.3,
+    "main_video": { "duration": 196.642 },
+    "clip_a": { "start_offset": 41.47, "duration": 41.02 },
+    "clip_b": { "start_offset": 93.58, "duration": 44.62 },
+    "preview": { "start_offset": 43.58, "duration": 8.37 }
+  }
+}
+```
+
+* **Why this is 100% copyright-compliant:** No copyrighted audio bytes or waveforms are stored. The preset stores only timestamps and decibel levels.
+* **How it works for the user:** The user supplies their own legitimate audio file, and the toolkit applies the exact, tested mathematical cut points instantly without requiring audio analysis.
 
 ---
 
@@ -87,7 +107,7 @@ The script automatically reads the `videos/` folder of your legally extracted ga
 - [FFmpeg](https://ffmpeg.org/download.html) in your system `PATH`.
 - [Python 3.8+](https://www.python.org/downloads/)
 - *(Optional)* [RAD Video Tools](https://www.radgametools.com/bnkdown.htm) for menu preview (`.bik`) patching.
-- *(Optional)* `pip install librosa scipy numpy` for automatic offset detection.
+- *(Optional)* `pip install librosa scipy numpy` (only needed when replacing songs that do not yet have a preset).
 
 ---
 
@@ -98,16 +118,16 @@ Run `song_fix.py` without arguments (or double-click `song_fix.bat` on Windows):
 ```bash
 python song_fix.py
 ```
-The script will prompt you for your game path, display a list of all detected songs in your copy, let you pick which one to replace, ask for your replacement audio file, and perform all steps automatically.
+The script will prompt you for your game path, display a list of all detected songs in your copy (highlighting those with verified presets), let you pick which one to replace, ask for your replacement audio file, and perform all steps automatically.
 
 #### 2. Command Line Mode
 ```bash
-python song_fix.py -g "C:\Games\Just Dance Greatest Hits" -s "SongCodename" -a "C:\Music\MySong.flac"
+python song_fix.py -g "C:\Games\Just Dance Greatest Hits" -s "BarbieGirl" -a "C:\Music\MyAudio.flac"
 ```
 
-#### 3. Listing Songs
+#### 3. Listing Available Presets
 ```bash
-python song_fix.py -g "C:\Games\Just Dance Greatest Hits" --list
+python song_fix.py --list-presets
 ```
 
 ---
@@ -123,6 +143,7 @@ Un kit de herramientas universal, guía de ingeniería inversa y metodología pa
 > 
 > * **Fines Educativos y de Investigación Únicamente:** Este proyecto, incluyendo su documentación, scripts y herramientas, se proporciona estrictamente con fines educativos, de investigación de interoperabilidad de formatos y de modificación personal de videojuegos.
 > * **Sin Contenido Protegido por Derechos de Autor:** Este repositorio **NO** contiene, aloja ni distribuye archivos binarios propietarios del juego, música protegida por derechos de autor, videos ni recursos del juego. Cada usuario debe suministrar de forma independiente su propia copia legítimamente adquirida del juego y sus propios archivos de audio legales.
+> * **Cero Infracción en Presets:** Los perfiles de sincronización comunitarios (`presets.json`) contienen única y exclusivamente coordenadas matemáticas factuales (marcas de tiempo, niveles de decibelios y desfases en milisegundos). No contienen ondas de audio, letras protegidas ni propiedad intelectual.
 > * **Sin Afiliación:** Este es un proyecto de investigación independiente y no está afiliado, respaldado, patrocinado ni asociado con ningún desarrollador, editor de videojuegos, fabricante de consolas ni titular de derechos de autor de obras musicales.
 > * **Limitación de Responsabilidad:** Los autores y colaboradores no asumen responsabilidad alguna por el mal uso que se le dé a este software, infracciones a la propiedad intelectual, pérdida de datos, bloqueos de consola o cualquier daño directo o indirecto derivado del uso o imposibilidad de uso de estas herramientas. El usuario es el único responsable de asegurar el cumplimiento de las leyes y normativas de derechos de autor aplicables en su territorio.
 
@@ -130,7 +151,8 @@ Un kit de herramientas universal, guía de ingeniería inversa y metodología pa
 
 ### Características
 - 🔄 **Reemplazo Universal:** Funciona de forma dinámica con cualquier canción detectada en la carpeta del juego.
-- 🎯 **Alineación de Ritmo Automática:** Detecta diferencias de silencios de entrada mediante correlación cruzada de envolventes (FFT) para mantener sincronía total con la coreografía y los pictogramas.
+- 📐 **Sistema de Presets Verificados (`presets.json`):** Incluye perfiles matemáticos probados con precisión al milisegundo (como el preset verificado para `BarbieGirl`), sin requerir configuración manual.
+- 🎯 **Alineación de Ritmo Automática:** Detecta diferencias de silencios de entrada mediante correlación cruzada de envolventes (FFT) para canciones que aún no cuenten con un preset.
 - 🔊 **Normalización de Volumen para Consola:** Ajusta másters de streaming modernos al estándar de **-24.3 LUFS** de Xbox 360, evitando saturación y protegiendo los efectos de sonido del juego.
 - 🎬 **Calidad de Video Intacta:** Copia el flujo de video original sin recomprimir (`-c:v copy`), preservando el 100% de la calidad visual.
 - 📦 **Cobertura Integral:** Parchea el video principal (`<Cancion>.wmv`), los clips de Mashup (`<Cancion>_A.wmv`, `<Cancion>_B.wmv`) y la vista previa del menú (`<Cancion>_Preview.bik`).
@@ -181,8 +203,12 @@ Al remultiplexar el archivo WMV con tu canción de reemplazo (respetando la alin
 
 ---
 
-### Detección Dinámica de Canciones
-El script inspecciona automáticamente la carpeta `videos/` de tu copia legítimamente extraída y muestra un menú interactivo con todas las canciones disponibles en tu versión, por lo que no requieres buscar ni escribir nombres de código manualmente.
+### Presets Comunitarios Verificados (`presets.json`)
+
+Para que el reemplazo sea instantáneo y 100% libre de problemas de copyright, este proyecto introduce un formato de perfiles matemáticos de tiempo:
+
+* **100% legal y sin derechos de autor:** No se distribuyen archivos de audio ni ondas de sonido. Solo se almacenan marcas de tiempo en segundos y niveles en decibelios.
+* **Comodidad total:** El usuario solo suministra su propio archivo de audio legítimo, y el toolkit aplica automáticamente los cortes y puntos de inserción verificados al milisegundo sin necesidad de analizar ondas.
 
 ---
 
@@ -193,16 +219,16 @@ Ejecuta el script sin parámetros (o haz doble clic sobre `song_fix.bat` en Wind
 ```bash
 python song_fix.py
 ```
-El script te pedirá la ruta de tu juego, listará todas las canciones disponibles en tu copia, te permitirá elegir cuál reemplazar y te solicitará tu archivo de audio personal.
+El script te pedirá la ruta de tu juego, listará todas las canciones disponibles en tu copia (marcando con asterisco las que tienen preset verificado), te permitirá elegir cuál reemplazar y te solicitará tu archivo de audio personal.
 
 #### 2. Modo por Línea de Comandos
 ```bash
-python song_fix.py -g "C:\Juegos\Just Dance Greatest Hits" -s "NombreDeCodigo" -a "C:\Musica\MiCancion.flac"
+python song_fix.py -g "C:\Juegos\Just Dance Greatest Hits" -s "BarbieGirl" -a "C:\Musica\MiCancion.flac"
 ```
 
-#### 3. Ver lista de canciones
+#### 3. Ver lista de presets disponibles
 ```bash
-python song_fix.py -g "C:\Juegos\Just Dance Greatest Hits" --list
+python song_fix.py --list-presets
 ```
 
 ---

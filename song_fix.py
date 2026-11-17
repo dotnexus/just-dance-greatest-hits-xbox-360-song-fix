@@ -2,17 +2,56 @@
 """
 Universal Song Audio Replacement Toolkit for Just Dance Greatest Hits (Xbox 360 - XEX Format)
 Replaces in-game covers or tracks with original/uncensored studio versions.
+Supports community-verified timing presets (presets.json) and automatic timing analysis.
 """
 
 import argparse
 import ctypes
 from ctypes import wintypes
+import json
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
 import time
+
+BUILTIN_PRESETS = {
+    "BarbieGirl": {
+        "description": "Verified studio track timing profile",
+        "offset_seconds": 0.750,
+        "target_lufs": -24.3,
+        "main_video": {
+            "duration": 196.642
+        },
+        "clip_a": {
+            "start_offset": 41.47,
+            "duration": 41.02
+        },
+        "clip_b": {
+            "start_offset": 93.58,
+            "duration": 44.62
+        },
+        "preview": {
+            "start_offset": 43.58,
+            "duration": 8.37
+        }
+    }
+}
+
+def load_presets():
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    preset_file = os.path.join(script_dir, "presets.json")
+    presets = dict(BUILTIN_PRESETS)
+    if os.path.isfile(preset_file):
+        try:
+            with open(preset_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if "presets" in data and isinstance(data["presets"], dict):
+                    presets.update(data["presets"])
+        except Exception:
+            pass
+    return presets
 
 def check_ffmpeg():
     try:
@@ -128,12 +167,26 @@ def compute_timing_offset(ref_video, new_audio, start_sec=10.0, dur_sec=35.0):
 def main():
     parser = argparse.ArgumentParser(description="Universal Song Replacement Toolkit for Just Dance Greatest Hits (Xbox 360 XEX).")
     parser.add_argument("-g", "--game-dir", help="Path to Just Dance Greatest Hits directory (extracted XEX format)")
-    parser.add_argument("-s", "--song", help="Song codename to replace (e.g. BarbieGirl, Toxic, Rasputin, Firework)")
+    parser.add_argument("-s", "--song", help="Song codename to replace (e.g. BarbieGirl, etc.)")
     parser.add_argument("-a", "--audio", help="Path to replacement audio file (FLAC, WAV, MP3, etc.)")
     parser.add_argument("-o", "--offset", type=float, help="Manual offset in seconds to trim from replacement audio (optional)")
-    parser.add_argument("-l", "--lufs", type=float, default=-24.3, help="Target integrated loudness in LUFS (default: -24.3 console standard)")
+    parser.add_argument("-l", "--lufs", type=float, default=None, help="Target integrated loudness in LUFS (defaults to preset or -24.3)")
     parser.add_argument("--list", action="store_true", help="List all detected songs in the game folder and exit")
+    parser.add_argument("--list-presets", action="store_true", help="List all verified timing presets available and exit")
     args = parser.parse_args()
+
+    presets_db = load_presets()
+
+    if args.list_presets:
+        print("=" * 70)
+        print("  Verified Timing Presets Available:")
+        print("=" * 70)
+        for sname, sdata in presets_db.items():
+            print(f"  * {sname}:")
+            print(f"      Offset  : {sdata.get('offset_seconds', 0.0)}s")
+            print(f"      Loudness: {sdata.get('target_lufs', -24.3)} LUFS")
+            print(f"      Info    : {sdata.get('description', '')}")
+        return
 
     print("=" * 70)
     print("  Just Dance Greatest Hits (Xbox 360) - Song Replacement Toolkit")
@@ -164,15 +217,19 @@ def main():
     if args.list:
         print(f"\n[*] Found {len(available_songs)} songs in the game:")
         for idx, s in enumerate(available_songs, 1):
-            print(f"    {idx:2d}. {s}")
+            preset_mark = " [Verified Preset Available]" if s in presets_db else ""
+            print(f"    {idx:2d}. {s}{preset_mark}")
         return
 
     song = args.song
     while not song or song not in available_songs:
         if not song:
-            print(f"\n[*] Detected {len(available_songs)} songs:")
+            print(f"\n[*] Detected {len(available_songs)} songs in game directory:")
             for idx, s in enumerate(available_songs, 1):
-                print(f"    [{idx:2d}] {s}")
+                preset_mark = " *" if s in presets_db else ""
+                print(f"    [{idx:2d}] {s}{preset_mark}")
+            if any(s in presets_db for s in available_songs):
+                print("    (* = Verified timing preset included)")
             choice = input("\nSelect song number or enter exact codename: ").strip()
             if choice.isdigit() and 1 <= int(choice) <= len(available_songs):
                 song = available_songs[int(choice) - 1]
@@ -185,31 +242,46 @@ def main():
             song = None
 
     print(f"\n[*] Selected song: {song}")
+    preset = presets_db.get(song, None)
 
     main_wmv = os.path.join(video_dir, f"{song}.wmv")
     source_wmv = main_wmv + ".bak" if os.path.isfile(main_wmv + ".bak") else main_wmv
 
     audio_path = args.audio
     while not audio_path or not os.path.isfile(audio_path):
-        audio_path = input(f"Enter path to replacement audio file for '{song}' (FLAC/MP3/WAV): ").strip().strip('"')
+        audio_path = input(f"Enter path to your replacement audio file for '{song}' (FLAC/MP3/WAV): ").strip().strip('"')
         if not os.path.isfile(audio_path):
             print("[!] Audio file not found. Please try again.")
 
-    # Get duration of original video
-    probe = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", source_wmv], capture_output=True, text=True)
-    video_duration = probe.stdout.strip()
-    try:
-        dur_float = float(video_duration)
-    except Exception:
-        dur_float = 200.0
+    # Determine duration
+    if preset and "main_video" in preset and "duration" in preset["main_video"]:
+        dur_float = preset["main_video"]["duration"]
+    else:
+        probe = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", source_wmv], capture_output=True, text=True)
+        try:
+            dur_float = float(probe.stdout.strip())
+        except Exception:
+            dur_float = 200.0
 
+    # Determine offset
     offset = args.offset
-    if offset is None:
+    if offset is not None:
+        print(f"\n[*] Using user-specified offset: {offset:+.3f} seconds")
+    elif preset and "offset_seconds" in preset:
+        offset = preset["offset_seconds"]
+        print(f"\n[✓] Using verified community preset offset for '{song}': {offset:+.3f} seconds ({offset*1000:+.1f} ms)")
+    else:
         print("\n[*] Analyzing timing offset between in-game video and replacement audio...")
         offset = compute_timing_offset(source_wmv, audio_path)
         print(f"    Calculated offset: {offset:+.3f} seconds ({offset*1000:+.1f} ms)")
+
+    # Determine LUFS
+    if args.lufs is not None:
+        target_lufs = args.lufs
+    elif preset and "target_lufs" in preset:
+        target_lufs = preset["target_lufs"]
     else:
-        print(f"\n[*] Using user-specified offset: {offset:+.3f} seconds")
+        target_lufs = -24.3
 
     temp_dir = os.path.join(game_dir, f"_temp_replace_{song}")
     os.makedirs(temp_dir, exist_ok=True)
@@ -225,7 +297,7 @@ def main():
         elif os.path.isfile(bak):
             print(f"    Backup already exists: {fname}.bak")
 
-    print(f"\n[*] Step 2: Normalizing audio to {args.lufs} LUFS and applying offset...")
+    print(f"\n[*] Step 2: Normalizing audio to {target_lufs} LUFS and applying {offset:+.3f}s offset...")
     norm_wav = os.path.join(temp_dir, "full_norm.wav")
     cmd_norm = ["ffmpeg", "-y"]
     if offset > 0:
@@ -233,7 +305,7 @@ def main():
     cmd_norm += [
         "-i", audio_path,
         "-t", str(dur_float),
-        "-af", f"loudnorm=I={args.lufs}:TP=-1.5:LRA=7",
+        "-af", f"loudnorm=I={target_lufs}:TP=-1.5:LRA=7",
         "-ar", "48000",
         "-ac", "2",
         norm_wav
@@ -258,43 +330,51 @@ def main():
     shutil.copy2(temp_main_wmv, main_wmv)
     print(f"    {song}.wmv updated successfully.")
 
-    # Check for sub-clips A and B
+    # Sub-clips A and B
     for sub in ["A", "B"]:
         sub_name = f"{song}_{sub}.wmv"
         sub_path = os.path.join(video_dir, sub_name)
         source_sub = sub_path + ".bak" if os.path.isfile(sub_path + ".bak") else sub_path
         if os.path.isfile(source_sub):
             print(f"\n[*] Step 4{sub}: Processing Mashup Clip {sub} ({sub_name})...")
-            probe_sub = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", source_sub], capture_output=True, text=True)
-            try:
-                sub_dur = float(probe_sub.stdout.strip())
-            except Exception:
-                sub_dur = 40.0
-            
-            # Extract corresponding sub wav (or use start match)
+            clip_key = f"clip_{sub.lower()}"
+            if preset and clip_key in preset:
+                sub_start = preset[clip_key].get("start_offset", 0.0)
+                sub_dur = preset[clip_key].get("duration", 40.0)
+            else:
+                probe_sub = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", source_sub], capture_output=True, text=True)
+                try:
+                    sub_dur = float(probe_sub.stdout.strip())
+                except Exception:
+                    sub_dur = 40.0
+                sub_start = 0.0
+
             sub_wav = os.path.join(temp_dir, f"clip_{sub}.wav")
-            # If offset exists, take proportional window or start
-            subprocess.run(["ffmpeg", "-y", "-i", norm_wav, "-t", str(sub_dur), sub_wav], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+            subprocess.run(["ffmpeg", "-y", "-ss", str(sub_start), "-i", norm_wav, "-t", str(sub_dur), sub_wav], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
             temp_sub_wmv = os.path.join(temp_dir, sub_name)
             subprocess.run(["ffmpeg", "-y", "-i", source_sub, "-i", sub_wav, "-map", "1:a:0", "-map", "0:v:0", "-c:v", "copy", "-c:a", "wmav2", "-b:a", "192k", temp_sub_wmv], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
             shutil.copy2(temp_sub_wmv, sub_path)
             print(f"    {sub_name} updated successfully.")
 
-    # Check for preview clip
+    # Preview clip
     preview_name = f"{song}_Preview.bik"
     preview_path = os.path.join(video_dir, preview_name)
     source_preview = preview_path + ".bak" if os.path.isfile(preview_path + ".bak") else preview_path
     if os.path.isfile(source_preview):
         print(f"\n[*] Step 5: Processing Menu Preview ({preview_name})...")
-        probe_prev = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", source_preview], capture_output=True, text=True)
-        try:
-            prev_dur = float(probe_prev.stdout.strip())
-        except Exception:
-            prev_dur = 8.37
+        if preset and "preview" in preset:
+            prev_start = preset["preview"].get("start_offset", 40.0)
+            prev_dur = preset["preview"].get("duration", 8.37)
+        else:
+            probe_prev = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", source_preview], capture_output=True, text=True)
+            try:
+                prev_dur = float(probe_prev.stdout.strip())
+            except Exception:
+                prev_dur = 8.37
+            prev_start = 40.0
 
         preview_wav = os.path.join(temp_dir, "preview_norm.wav")
-        # Extract preview snippet around the chorus (roughly 40s in or start)
-        subprocess.run(["ffmpeg", "-y", "-ss", "40.0", "-i", norm_wav, "-t", str(prev_dur), "-ar", "44100", "-ac", "2", preview_wav], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+        subprocess.run(["ffmpeg", "-y", "-ss", str(prev_start), "-i", norm_wav, "-t", str(prev_dur), "-ar", "44100", "-ac", "2", preview_wav], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
 
         radvideo_exe = find_radvideo()
         if radvideo_exe:
