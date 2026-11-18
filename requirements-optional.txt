@@ -1,4 +1,4 @@
 # Only needed to detect the timing offset automatically for songs that do NOT have a preset.
 librosa>=0.10,<1
-scipy>=1.10,<2
+scipy>=1.18.1,<2
 numpy>=1.24,<3
