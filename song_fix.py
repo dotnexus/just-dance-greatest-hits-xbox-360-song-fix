@@ -44,22 +44,22 @@ BUILTIN_PRESETS = {
     },
     "CantTouchThis": {
         "description": "Verified studio track timing profile",
-        "offset_seconds": -3.000,
+        "offset_seconds": -2.800,
         "target_lufs": -24.3,
         "fade_out_seconds": 205.50,
         "main_video": {
             "duration": 210.68
         },
         "clip_a": {
-            "start_offset": 137.21,
+            "start_offset": 93.96,
             "duration": 42.07
         },
         "clip_b": {
-            "start_offset": 158.87,
+            "start_offset": 162.48,
             "duration": 48.16
         },
         "preview": {
-            "start_offset": 4.23,
+            "start_offset": 7.84,
             "duration": 10.67
         }
     }

@@ -3,7 +3,7 @@
   "description": "Verified timing, offset, and loudness presets for Just Dance Greatest Hits (Xbox 360). Contains purely mathematical metadata and timestamps with zero copyrighted audio/video data.",
   "presets": {
     "BarbieGirl": {
-      "description": "Verified studio track timing profile (Aqua)",
+      "description": "Verified studio track timing profile",
       "offset_seconds": 0.75,
       "target_lufs": -24.3,
       "main_video": {
@@ -23,23 +23,23 @@
       }
     },
     "CantTouchThis": {
-      "description": "Verified studio track timing profile (M.C. Hammer)",
-      "offset_seconds": -3.0,
+      "description": "Verified studio track timing profile",
+      "offset_seconds": -2.8,
       "target_lufs": -24.3,
       "fade_out_seconds": 205.5,
       "main_video": {
         "duration": 210.68
       },
       "clip_a": {
-        "start_offset": 137.21,
+        "start_offset": 93.96,
         "duration": 42.07
       },
       "clip_b": {
-        "start_offset": 158.87,
+        "start_offset": 162.48,
         "duration": 48.16
       },
       "preview": {
-        "start_offset": 4.23,
+        "start_offset": 7.84,
         "duration": 10.67
       }
     }

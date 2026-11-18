@@ -262,6 +262,7 @@ def encode_pcm_to_wmapro(pcm_data, block_align, target_blocks_count):
     pos = 0
     total_pcm = len(pcm_data)
     encoded_blocks = []
+    block_timestamps = []
     rt_time = 0
 
     while pos < total_pcm:
@@ -283,6 +284,7 @@ def encode_pcm_to_wmapro(pcm_data, block_align, target_blocks_count):
             hr = vtbl.ProcessOutput(pMediaObject.value, 0, 1, ctypes.byref(out_db), ctypes.byref(out_status))
             if out_buf.cur_len == block_align:
                 encoded_blocks.append(bytes(out_buf.raw_buf[:block_align]))
+                block_timestamps.append(out_db.rtTimestamp / 10000.0)
             if not (out_db.dwStatus & 1):
                 break
 
@@ -303,6 +305,7 @@ def encode_pcm_to_wmapro(pcm_data, block_align, target_blocks_count):
             hr = vtbl.ProcessOutput(pMediaObject.value, 0, 1, ctypes.byref(out_db), ctypes.byref(out_status))
             if out_buf.cur_len == block_align:
                 encoded_blocks.append(bytes(out_buf.raw_buf[:block_align]))
+                block_timestamps.append(out_db.rtTimestamp / 10000.0)
             if not (out_db.dwStatus & 1):
                 break
 
@@ -313,6 +316,7 @@ def encode_pcm_to_wmapro(pcm_data, block_align, target_blocks_count):
         hr = vtbl.ProcessOutput(pMediaObject.value, 0, 1, ctypes.byref(out_db), ctypes.byref(out_status))
         if out_buf.cur_len == block_align:
             encoded_blocks.append(bytes(out_buf.raw_buf[:block_align]))
+            block_timestamps.append(out_db.rtTimestamp / 10000.0)
         else:
             break
 
@@ -322,10 +326,11 @@ def encode_pcm_to_wmapro(pcm_data, block_align, target_blocks_count):
             f"WMA Pro encoder produced {len(encoded_blocks)} blocks, expected {target_blocks_count}")
     elif len(encoded_blocks) > target_blocks_count:
         encoded_blocks = encoded_blocks[:target_blocks_count]
+        block_timestamps = block_timestamps[:target_blocks_count]
 
-    return encoded_blocks
+    return encoded_blocks, block_timestamps
 
-def inject_audio_into_wmv(orig_wmv_path, new_blocks, out_wmv_path, psz, block_align, tot_pkts):
+def inject_audio_into_wmv(orig_wmv_path, new_blocks, out_wmv_path, psz, block_align, tot_pkts, block_timestamps=None):
     """
     Copies the original WMV file byte-for-byte, swapping only the audio payloads.
     Preserves all headers, packet structures, video stream payloads, timestamps,
@@ -373,6 +378,7 @@ def inject_audio_into_wmv(orig_wmv_path, new_blocks, out_wmv_path, psz, block_al
                 mon, k = rd(pkt, o, (pt>>4)&3); o += k
                 off, k = rd(pkt, o, (pt>>2)&3); o += k
                 rl, k = rd(pkt, o, pt&3); o += k
+                rep_start = o
                 rep = pkt[o:o+rl]; o += rl
                 if multi: dl, k = rd(pkt, o, plt); o += k
                 else: dl = psz - o - pad
@@ -380,6 +386,9 @@ def inject_audio_into_wmv(orig_wmv_path, new_blocks, out_wmv_path, psz, block_al
                 if sn == 1: # Audio stream
                     if dl == block_align and block_idx < len(new_blocks):
                         pkt[o : o + dl] = new_blocks[block_idx]
+                        if rl >= 8 and block_timestamps is not None and block_idx < len(block_timestamps):
+                            new_pts = 3000 + int(round(block_timestamps[block_idx]))
+                            pkt[rep_start + 4 : rep_start + 8] = struct.pack('<I', new_pts)
                         block_idx += 1
                         replaced_payloads += 1
 
@@ -435,6 +444,6 @@ def patch_wmv_with_audio(orig_wmv_path, wav_path, out_wmv_path):
     hs, psz, block_align, tot_pkts, audio_payload_count = get_wmv_audio_info(orig_wmv_path)
     pcm_data = read_wav_pcm(wav_path)
 
-    wma_blocks = encode_pcm_to_wmapro(pcm_data, block_align, audio_payload_count)
-    replaced = inject_audio_into_wmv(orig_wmv_path, wma_blocks, out_wmv_path, psz, block_align, tot_pkts)
+    wma_blocks, block_timestamps = encode_pcm_to_wmapro(pcm_data, block_align, audio_payload_count)
+    replaced = inject_audio_into_wmv(orig_wmv_path, wma_blocks, out_wmv_path, psz, block_align, tot_pkts, block_timestamps)
     return replaced == audio_payload_count
