@@ -31,7 +31,8 @@ A universal toolkit, reverse-engineering guide, and methodology to replace in-ga
 - 📐 **Verified Presets System (`presets.json`):** Includes tested, millisecond-accurate mathematical timing profiles (such as the verified preset for `BarbieGirl`), requiring zero manual configuration.
 - 🎯 **Automatic Beat Alignment:** Automatically detects lead-in silence differences using onset cross-correlation for any track without a preset.
 - 🔊 **Console Loudness Normalization:** Automatically adjusts modern loud audio masters to the **-24.3 LUFS** Xbox 360 standard, preventing distortion and protecting in-game sound effects.
-- 🎬 **Lossless Video Quality:** Copies the original video stream directly (`-c:v copy`), preserving 100% of the visual fidelity.
+- 🎬 **Lossless Video Quality:** Keeps the video stream and the whole ASF container byte-for-byte. Only the audio payloads are replaced (native WMA Pro, same block size and bitrate as the original), so the dancers and the Kinect scoring stay intact.
+- 🛡️ **Safe Writes:** Every file is written to a temporary file and swapped in at the end, so an interruption never leaves a half-written game file. `--restore` puts the originals back from the `.bak` backups.
 - 📦 **Full Track Coverage:** Patches the main song video (`<Song>.wmv`), Mashup/Medley clips (`<Song>_A.wmv`, `<Song>_B.wmv`), and the menu selection preview (`<Song>_Preview.bik`).
 - 🛡️ **Automatic Backups:** Generates safety `.bak` files before touching any game asset.
 
@@ -76,7 +77,9 @@ The game engine streams both the dancers and the music simultaneously from Windo
 - **Video:** `WMV3` or `VC-1` at 1280x1440, 25 fps.
 - **Audio:** WMA Standard (`wmav2`) or WMA Pro, 48,000 Hz, Stereo, 192 kbps.
 
-By remuxing the WMV file with your replacement audio track (preserving the exact beat alignment), **the Kinect scoring, pictograms, and choreography remain 100% synchronized.**
+By replacing only the audio payloads of the WMV file with your replacement track (preserving the exact beat alignment), **the Kinect scoring, pictograms, and choreography remain 100% synchronized.**
+
+> **Do not remux the WMV with FFmpeg.** The video of each song is a 1280x1440 frame: the top half has the colored dancers and the bottom half is their mask. Every video payload carries 2 extra bytes (the frame duration) and its timestamps include a 3-second preroll. FFmpeg drops that data and shifts the timestamps, and the console then shows a smeared mess instead of the dancers (or nothing at all). This toolkit copies the original file and only swaps the audio blocks, using the WMAudio Encoder that ships with Windows.
 
 ---
 
@@ -104,10 +107,11 @@ To make song replacement effortless and completely copyright-safe, this reposito
 ---
 
 ### Prerequisites
-- [FFmpeg](https://ffmpeg.org/download.html) in your system `PATH`.
+- **Windows 10/11** (the WMA Pro encoder is the one built into Windows).
+- [FFmpeg](https://ffmpeg.org/download.html) in your system `PATH` (`ffmpeg` and `ffprobe`).
 - [Python 3.8+](https://www.python.org/downloads/)
-- *(Optional)* [RAD Video Tools](https://www.radgametools.com/bnkdown.htm) for menu preview (`.bik`) patching.
-- *(Optional)* `pip install librosa scipy numpy` (only needed when replacing songs that do not yet have a preset).
+- *(Optional)* [RAD Video Tools](https://www.radgametools.com/bnkdown.htm) for menu preview (`.bik`) patching. The toolkit only runs `radvideo64.exe` if it has a valid digital signature, and looks for it in `Program Files`. Use `--radvideo "<path>"` if it lives somewhere else. Without it, the preview audio is exported as `<Song>_preview.wav` instead.
+- *(Optional)* `pip install -r requirements-optional.txt` (only needed when replacing songs that do not yet have a preset).
 
 ---
 
@@ -128,6 +132,18 @@ python song_fix.py -g "C:\Games\Just Dance Greatest Hits" -s "BarbieGirl" -a "C:
 #### 3. Listing Available Presets
 ```bash
 python song_fix.py --list-presets
+```
+
+#### 4. Restoring the Original Files
+```bash
+python song_fix.py -g "C:\Games\Just Dance Greatest Hits" -s "BarbieGirl" --restore
+```
+
+Other options: `-o` (manual offset, negative adds silence before the audio), `-l` (target LUFS), `--radvideo` (path to `radvideo64.exe`), `--verbose` (full FFmpeg output). Type `q` at any prompt to quit.
+
+#### 5. Running the Tests
+```bash
+python -m unittest discover -s tests -v
 ```
 
 ---
@@ -154,7 +170,8 @@ Un kit de herramientas universal, guía de ingeniería inversa y metodología pa
 - 📐 **Sistema de Presets Verificados (`presets.json`):** Incluye perfiles matemáticos probados con precisión al milisegundo (como el preset verificado para `BarbieGirl`), sin requerir configuración manual.
 - 🎯 **Alineación de Ritmo Automática:** Detecta diferencias de silencios de entrada mediante correlación cruzada de envolventes (FFT) para canciones que aún no cuenten con un preset.
 - 🔊 **Normalización de Volumen para Consola:** Ajusta másters de streaming modernos al estándar de **-24.3 LUFS** de Xbox 360, evitando saturación y protegiendo los efectos de sonido del juego.
-- 🎬 **Calidad de Video Intacta:** Copia el flujo de video original sin recomprimir (`-c:v copy`), preservando el 100% de la calidad visual.
+- 🎬 **Calidad de Video Intacta:** Conserva el video y todo el contenedor ASF byte por byte. Solo se reemplazan los bloques de audio (WMA Pro nativo, con el mismo tamaño de bloque y bitrate que el original), así que los bailarines y la puntuación del Kinect no se tocan.
+- 🛡️ **Escritura Segura:** Cada archivo se escribe primero en uno temporal y se intercambia al final, así que una interrupción nunca deja un archivo del juego a medio escribir. `--restore` devuelve los originales desde los respaldos `.bak`.
 - 📦 **Cobertura Integral:** Parchea el video principal (`<Cancion>.wmv`), los clips de Mashup (`<Cancion>_A.wmv`, `<Cancion>_B.wmv`) y la vista previa del menú (`<Cancion>_Preview.bik`).
 - 🛡️ **Respaldos Automáticos:** Crea respaldos de seguridad `.bak` antes de modificar cualquier archivo.
 
@@ -180,8 +197,8 @@ Just Dance Greatest Hits/
 ├── Data360_<NombreCancion>.forge      <-- ¡NO CONTIENE AUDIO!
 ├── videos/
 │   ├── <NombreCancion>.wmv            <-- AQUÍ ESTÁ EL AUDIO Y VIDEO REAL
-│   ├── <NombreCancion>.wmv_A          <-- Audio y video Mashup Clip A
-│   ├── <NombreCancion>.wmv_B          <-- Audio y video Mashup Clip B
+│   ├── <NombreCancion>_A.wmv          <-- Audio y video Mashup Clip A
+│   ├── <NombreCancion>_B.wmv          <-- Audio y video Mashup Clip B
 │   └── <NombreCancion>_Preview.bik    <-- Vista previa de menú
 ```
 
@@ -199,7 +216,16 @@ El motor reproduce a los bailarines y la música simultáneamente desde archivos
 - **Video:** `WMV3` o `VC-1` en 1280x1440 a 25 fps.
 - **Audio:** WMA Standard (`wmav2`) o WMA Pro, 48,000 Hz, Estéreo, 192 kbps.
 
-Al remultiplexar el archivo WMV con tu canción de reemplazo (respetando la alineación del compás), **el sistema de puntuación, los pictogramas y el Kinect se mantienen 100% sincronizados.**
+Al reemplazar solo los bloques de audio del archivo WMV con tu canción (respetando la alineación del compás), **el sistema de puntuación, los pictogramas y el Kinect se mantienen 100% sincronizados.**
+
+> **No remultiplexes el WMV con FFmpeg.** El video de cada canción es un cuadro de 1280x1440. La mitad de arriba tiene a los bailarines de colores y la de abajo es su máscara. Cada bloque de video lleva 2 bytes extra (la duración del cuadro) y sus tiempos incluyen 3 segundos de preroll. FFmpeg descarta esos datos y corre los tiempos, y la consola muestra una mancha en vez de los bailarines (o nada). Este toolkit copia el archivo original y solo cambia los bloques de audio, con el codificador WMAudio que viene con Windows.
+
+### Requisitos y Opciones
+- **Windows 10/11**, [FFmpeg](https://ffmpeg.org/download.html) (con `ffprobe`) en el `PATH` y [Python 3.8+](https://www.python.org/downloads/).
+- *(Opcional)* [RAD Video Tools](https://www.radgametools.com/bnkdown.htm) para la vista previa del menú. Solo se ejecuta `radvideo64.exe` si tiene firma digital válida. Usa `--radvideo "<ruta>"` si está en otra carpeta.
+- *(Opcional)* `pip install -r requirements-optional.txt` para la detección automática de desfase en canciones sin preset.
+- Otras opciones: `--restore` (restaura los originales desde los `.bak`), `-o` (desfase manual, negativo agrega silencio antes del audio), `-l` (LUFS), `--verbose` (salida completa de FFmpeg). Escribe `q` en cualquier pregunta para salir.
+- Tests: `python -m unittest discover -s tests -v`.
 
 ---
 

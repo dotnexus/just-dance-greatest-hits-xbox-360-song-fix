@@ -13,7 +13,17 @@ venv/
 *.bik
 *.bak
 
+# Game files (never commit them)
+*.xex
+*.forge
+
+# Secrets / logs
+.env
+*.log
+AUDITORIA_*.md
+
 # Temporary files
+_temp_replace_*/
 temp/
 scratch/
 _temp_fix/

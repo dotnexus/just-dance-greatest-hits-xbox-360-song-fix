@@ -1,0 +1,7 @@
+# Every change needs a review from the owner.
+* @dotnexus
+
+# Presets feed the audio commands, so they always need the owner's review.
+/presets.json @dotnexus
+/wma_pro_injector.py @dotnexus
+/.github/ @dotnexus
